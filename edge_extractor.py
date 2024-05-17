@@ -139,8 +139,15 @@ class EdgeExtractor:
             f"prob_id1: {prob_id1}, prob_id2: {prob_id2} => cnt1: {cnt1}, cnt2: {cnt2}, common: {common_cnt}, ratio: {common_cnt / (cnt1 + cnt2)}"
         )
         return common_cnt / (cnt1 + cnt2) >= alpha
+    
+    def save_edges_at(self, edges: List[Tuple[int, int]], filename: str):
+        with open(filename, "w") as f:
+            json.dump(edges, f)
+        print("[EdgeExtractor] Finished")
+        print(f"Edges successfully saved at: {filename}.")
 
 
 # [Usage]
 # ee = EdgeExtractor("temp_probs.json")
 # edges = ee.extract_edges(alpha=0.1)
+# ee.save_edges_at(edges, "edges.json")
