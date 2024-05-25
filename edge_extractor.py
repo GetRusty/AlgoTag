@@ -1,5 +1,5 @@
-from selenium import webdriver
-from selenium.webdriver.common.by import By
+import requests
+from bs4 import BeautifulSoup as bs
 import json
 from typing import *
 
@@ -49,18 +49,18 @@ class EdgeExtractor:
     def _get_solved_user_list_at_page(self, prob_id: int,
                                       page_num: int) -> Optional[List[int]]:
         solved_status_url = f"https://www.acmicpc.net/problem/status/{prob_id}/{page_num}"
-        self.driver.get(solved_status_url)
+        headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36"}
+        page = requests.get(solved_status_url, headers=headers)
+        soup = bs(page.text, "html.parser")
 
         # check if finished
-        err_sign = self.driver.find_elements(By.CLASS_NAME, "error-v1")
+        err_sign = soup.select("div.error-v1")
         if err_sign:
             return None
 
         # find user list
-        table = self.driver.find_element(By.CLASS_NAME, "col-md-10")
-        tbody = table.find_element(By.TAG_NAME, "tbody")
-        entries = tbody.find_elements(By.TAG_NAME, "tr")
-
+        entries = soup.select("div.col-md-10 tbody")[0]
         # double check if finished
         if len(entries) == 0:
             return None
@@ -68,17 +68,12 @@ class EdgeExtractor:
         # fetch user list
         user_ids = []
         for entry in entries:
-            elems = entry.find_elements(By.TAG_NAME, "td")
+            elems = entry.select("td")
             user_id = elems[3].text
             user_ids.append(user_id)
-
         return user_ids
 
     def save_solved_users(self):
-        # open chrome webriver
-        options = webdriver.ChromeOptions()
-        self.driver = webdriver.Chrome(options=options)
-
         # check already fetched data
         try:
             with open(self.temp_filename, "r") as f:
@@ -88,7 +83,7 @@ class EdgeExtractor:
             print("[EdgeExtractor] Info")
             print(
                 f"file {self.temp_filename} already contains solved users of {len(data)} problems; we will pass fetching these problems."
-            )
+            )                
         except:
             data = {}
 
@@ -108,9 +103,6 @@ class EdgeExtractor:
             # save data right after fetching each problem's solved users
             with open(self.temp_filename, "w") as f:
                 json.dump(data, f)
-
-        # close webdriver
-        self.driver.close()
 
         print("[EdgeExtractor] Temporary Notice")
         print(f"Each problem's solved users saved at {self.temp_filename}.")
