@@ -22,6 +22,7 @@ class Search:
             json.dump(dict, f, ensure_ascii=False, indent=4)
         print("Successfully saved to", self.filename)
 
+    #internal only
     def get_prob_list(self, tag_id):
         result = []
         dest_url = "https://www.acmicpc.net/problemset?sort=ac_desc&algo=" + tag_id + "&algo_if=and&page="
