@@ -8,16 +8,25 @@ class EdgeExtractor:
 
     def __init__(self, filename: str):
         # read json file
-        with open(filename, "r") as f:
-            problems = json.load(f)
+        with open(filename, "rb") as f:
+            search_result = json.load(f)
 
         # sanity check
-        assert isinstance(problems, list)
-        print(
-            f"[EdgeExtractor] Complete reading {len(problems)} problems from {filename}"
-        )
+        assert isinstance(search_result, dict)
+        for tag in search_result.values():
+            print(tag)
+            assert isinstance(tag, dict)
+            assert "prob_list" in tag
+            assert isinstance(tag["prob_list"], list)
 
-        self.prob_ids = list(map(int, problems))
+        # get problems list
+        self.prob_ids = []
+        for tag in search_result.values():
+            self.prob_ids += tag["prob_list"]
+
+        print(
+            f"[EdgeExtractor] Complete reading {len(self.prob_ids)} problems from {filename}"
+        )
 
         # temporary JSON file name (for saving solved users)
         self.temp_filename = "_temp_fetched_solved_users.json"
@@ -70,16 +79,39 @@ class EdgeExtractor:
         options = webdriver.ChromeOptions()
         self.driver = webdriver.Chrome(options=options)
 
-        # fetch data
-        data = {}
-        for prob_id in self.prob_ids:
+        # check already fetched data
+        try:
+            with open(self.temp_filename, "r") as f:
+                data = json.load(f)
+            assert isinstance(data, dict)
+
+            print("[EdgeExtractor] Info")
+            print(
+                f"file {self.temp_filename} already contains solved users of {len(data)} problems; we will pass fetching these problems."
+            )
+        except:
+            data = {}
+
+        # fetch solved user
+        tot = len(self.prob_ids)
+        for idx, prob_id in enumerate(self.prob_ids):
+            # pass if already data exists
+            if str(prob_id) in data:
+                continue
+
             user_ids = self.get_solved_user_list(prob_id)
             data[prob_id] = user_ids
 
-        # close webdriver and save data
+            print(f"Fetching solved users of prob_id {prob_id} finished.")
+            print(f"Current status: {idx + 1}/{tot} problems fetched.")
+
+            # save data right after fetching each problem's solved users
+            with open(self.temp_filename, "w") as f:
+                json.dump(data, f)
+
+        # close webdriver
         self.driver.close()
-        with open(self.temp_filename, "w") as f:
-            json.dump(data, f)
+
         print("[EdgeExtractor] Temporary Notice")
         print(f"Each problem's solved users saved at {self.temp_filename}.")
         print(
@@ -87,27 +119,51 @@ class EdgeExtractor:
         )
 
     def extract_edges(self, alpha: float) -> List[Tuple[int, int]]:
-        # load solved users data
-        temp_filename = "_temp_fetched_solved_users.json"
+        file_found = False
+        data_mismatch = None
+
         try:
-            with open(temp_filename, "r") as f:
+            with open(self.temp_filename, "r") as f:
                 data = json.load(f)
+            file_found = True
+
+            # data check
+            for prob_id in self.prob_ids:
+                if str(prob_id) not in data:
+                    data_mismatch = prob_id
+                    raise Exception()
+
             print("[EdgeExtractor] Info")
             print(
                 f"Successfully read solved users dataset: {self.temp_filename}."
             )
         except:
             print("[EdgeExtractor] Warning")
-            print(f"JSON File {self.temp_filename} not found.")
+            if not file_found:
+                print(f"JSON File {self.temp_filename} not found")
+            elif data_mismatch is not None:
+                print(
+                    f"Data mismatch; counterexample: prob_id {prob_id} is not in {self.temp_filename}."
+                )
+
             print(
                 f"Starting to fetch each problem's solved users and save at {self.temp_filename}..."
             )
             self.save_solved_users()
-            with open(temp_filename, "r") as f:
+            with open(self.temp_filename, "r") as f:
                 data = json.load(f)
 
         # sanity check
         assert isinstance(data, dict)
+        assert len(data) == len(self.prob_ids)
+        for prob_id, users in data.items():
+            assert isinstance(users, list)
+
+        # build mapping from node_id to prob_id
+        node_to_prob = []
+        for idx, prob_id in enumerate(data.keys()):
+            assert self.prob_ids[idx] == int(prob_id)
+            node_to_prob.append({"node_id": idx, "prob_id": prob_id})
 
         # make set()
         users_set = {}
@@ -124,10 +180,13 @@ class EdgeExtractor:
                 prob_id2 = self.prob_ids[idx2]
 
                 if self.can_connect(users_set, alpha, prob_id1, prob_id2):
-                    edges.append((prob_id1, prob_id2))
-                    edges.append((prob_id2, prob_id1))
+                    edges.append((idx1, idx2))
+                    edges.append((idx2, idx1))
+                    print(
+                        f"=> Two edges connected between node1: {idx1} <=> node2: {idx2}, each of which represents prob_id1: {prob_id1}, prob_id2: {prob_id2}"
+                    )
 
-        return edges
+        return edges, node_to_prob
 
     def can_connect(self, users_set: Dict[int, Set[str]], alpha: float,
                     prob_id1: int, prob_id2: int) -> bool:
@@ -135,12 +194,17 @@ class EdgeExtractor:
         cnt1, cnt2 = len(users1), len(users2)
         common_cnt = len(users1.intersection(users2))
 
-        print(
-            f"prob_id1: {prob_id1}, prob_id2: {prob_id2} => cnt1: {cnt1}, cnt2: {cnt2}, common: {common_cnt}, ratio: {common_cnt / (cnt1 + cnt2)}"
-        )
-        return common_cnt / (cnt1 + cnt2) >= alpha
-    
-    def save_edges_at(self, edges: List[Tuple[int, int]], filename: str):
+        if common_cnt >= alpha * (cnt1 + cnt2):
+            print(f"Can connect prob_id1: {prob_id1}, prob_id2: {prob_id2}")
+            print(
+                f"cnt1: {cnt1}, cnt2: {cnt2}, common: {common_cnt}, ratio: {common_cnt / (cnt1 + cnt2)}"
+            )
+            return True
+        else:
+            return False
+
+    def save_edges_at(self, edges: List[Tuple[int, int]],
+                      node_to_prob: List[Dict[str, int]], filename: str):
         with open(filename, "w") as f:
             json.dump(edges, f)
         print("[EdgeExtractor] Finished")
@@ -148,6 +212,6 @@ class EdgeExtractor:
 
 
 # [Usage]
-# ee = EdgeExtractor("temp_probs.json")
-# edges = ee.extract_edges(alpha=0.1)
-# ee.save_edges_at(edges, "edges.json")
+ee = EdgeExtractor("search_result.json")
+edges, node_to_prob = ee.extract_edges(alpha=0.1)
+ee.save_edges_at(edges, node_to_prob, "edges.json")
