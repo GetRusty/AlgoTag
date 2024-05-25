@@ -50,7 +50,9 @@ class EdgeExtractor:
                                       page_num: int) -> Optional[List[int]]:
         solved_status_url = f"https://www.acmicpc.net/problem/status/{prob_id}/{page_num}"
         headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36"}
+            "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.77 Safari/537.36"
+        }
         page = requests.get(solved_status_url, headers=headers)
         soup = bs(page.text, "html.parser")
 
@@ -83,7 +85,7 @@ class EdgeExtractor:
             print("[EdgeExtractor] Info")
             print(
                 f"file {self.temp_filename} already contains solved users of {len(data)} problems; we will pass fetching these problems."
-            )                
+            )
         except:
             data = {}
 
@@ -147,14 +149,14 @@ class EdgeExtractor:
 
         # sanity check
         assert isinstance(data, dict)
-        assert len(data) == len(self.prob_ids)
-        for prob_id, users in data.items():
+        for prob_id in self.prob_ids:
+            assert str(prob_id) in data
+        for users in data.values():
             assert isinstance(users, list)
 
         # build mapping from node_id to prob_id
         node_to_prob = []
-        for idx, prob_id in enumerate(data.keys()):
-            assert self.prob_ids[idx] == int(prob_id)
+        for idx, prob_id in enumerate(self.prob_ids):
             node_to_prob.append({"node_id": idx, "prob_id": prob_id})
 
         # make set()
@@ -178,6 +180,9 @@ class EdgeExtractor:
                         f"=> Two edges connected between node1: {idx1} <=> node2: {idx2}, each of which represents prob_id1: {prob_id1}, prob_id2: {prob_id2}"
                     )
 
+        print(
+            f"Total {len(edges)}/{prob_num * (prob_num - 1)} edges connected between {prob_num} nodes."
+        )
         return edges, node_to_prob
 
     def can_connect(self, users_set: Dict[int, Set[str]], alpha: float,
