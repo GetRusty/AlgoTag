@@ -203,7 +203,7 @@ class EdgeExtractor:
     def save_edges_at(self, edges: List[Tuple[int, int]],
                       node_to_prob: List[Dict[str, int]], filename: str):
         with open(filename, "w") as f:
-            json.dump(edges, f)
+            json.dump({"edges": edges, "node_id_to_prob_id": node_to_prob}, f)
         print("[EdgeExtractor] Finished")
         print(f"Edges successfully saved at: {filename}.")
 
