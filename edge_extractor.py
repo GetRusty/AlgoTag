@@ -155,9 +155,9 @@ class EdgeExtractor:
             assert isinstance(users, list)
 
         # build mapping from node_id to prob_id
-        node_to_prob = []
-        for idx, prob_id in enumerate(self.prob_ids):
-            node_to_prob.append({"node_id": idx, "prob_id": prob_id})
+        # node_to_prob = []
+        # for idx, prob_id in enumerate(self.prob_ids):
+        #     node_to_prob.append({"node_id": idx, "prob_id": prob_id})
 
         # make set()
         users_set = {}
@@ -167,23 +167,24 @@ class EdgeExtractor:
 
         # calculate edge
         edges = []
-        prob_num = len(self.prob_ids)
+        prob_num = len(data)
+        prob_list = list(map(int, data.keys()))
         for idx1 in range(prob_num):
-            prob_id1 = self.prob_ids[idx1]
+            prob_id1 = prob_list[idx1]
             for idx2 in range(idx1 + 1, prob_num):
-                prob_id2 = self.prob_ids[idx2]
+                prob_id2 = prob_list[idx2]
 
                 if self.can_connect(users_set, alpha, prob_id1, prob_id2):
                     edges.append((idx1, idx2))
                     edges.append((idx2, idx1))
                     print(
-                        f"=> Two edges connected between node1: {idx1} <=> node2: {idx2}, each of which represents prob_id1: {prob_id1}, prob_id2: {prob_id2}"
+                        f"=> Two edges connected between prob_id1: {prob_id1} <=> prob_id2: {prob_id2}"
                     )
 
         print(
             f"Total {len(edges)}/{prob_num * (prob_num - 1)} edges connected between {prob_num} nodes."
         )
-        return edges, node_to_prob
+        return edges
 
     def can_connect(self, users_set: Dict[int, Set[str]], alpha: float,
                     prob_id1: int, prob_id2: int) -> bool:
@@ -200,15 +201,14 @@ class EdgeExtractor:
         else:
             return False
 
-    def save_edges_at(self, edges: List[Tuple[int, int]],
-                      node_to_prob: List[Dict[str, int]], filename: str):
+    def save_edges_at(self, edges: List[Tuple[int, int]], filename: str):
         with open(filename, "w") as f:
-            json.dump({"edges": edges, "node_id_to_prob_id": node_to_prob}, f)
+            json.dump({"edges": edges}, f)
         print("[EdgeExtractor] Finished")
         print(f"Edges successfully saved at: {filename}.")
 
 
 # [Usage]
 ee = EdgeExtractor("search_result.json")
-edges, node_to_prob = ee.extract_edges(alpha=0.1)
-ee.save_edges_at(edges, node_to_prob, "edges.json")
+edges = ee.extract_edges(alpha=0.1)
+ee.save_edges_at(edges, "edges.json")
