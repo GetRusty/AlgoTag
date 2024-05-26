@@ -17,13 +17,14 @@ class Search:
         if cookie != None:
             self.driver.add_cookie(cookie)
 
-    def save_to_file(self, dict):
+    def save_to_file(self, dic):
+        assert isinstance(dic, dict)
         with open(self.filename, "w", encoding='utf-8') as f:
-            json.dump(dict, f, ensure_ascii=False, indent=4)
+            json.dump(dic, f, ensure_ascii=False, indent=4)
         print("Successfully saved to", self.filename)
 
     #internal only
-    def get_prob_list(self, tag_id):
+    def get_prob_list(self, tag_id) -> List[int]:
         result = []
         dest_url = "https://www.acmicpc.net/problemset?sort=ac_desc&algo=" + tag_id + "&algo_if=and&page="
         iter = 0
